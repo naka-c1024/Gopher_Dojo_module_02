@@ -14,17 +14,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// curl -O https://projects.intra.42.fr/uploads/document/document/10749/19920104_091532.log
-// curl -I https://cdn.intra.42.fr/pdf/pdf/51100/ja.subject.pdf
-//  -> Accept-Ranges: bytesがあるから分割ダウンロードok
-// Content-Length: 1687489 バイトになっている
-// http://abehiroshi.la.coocan.jp/menu.htm
-// 阿部寛のホームページ
-
 const divNum = 5
 
-func goroutine(url string, arrRange []string) {
-	// var eg errgroup.Group
+func goroutine(url string, arrRange []string) (string, error) {
 	var splitData []string = make([]string, divNum)
 	eg, ctx := errgroup.WithContext(context.Background())
 	for i, ctxRange := range arrRange {
@@ -56,13 +48,13 @@ func goroutine(url string, arrRange []string) {
 		})
 	}
 	if err := eg.Wait(); err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 	var allData string
 	for _, v := range splitData {
 		allData += v
 	}
-	fmt.Print(allData)
+	return allData, nil
 }
 
 func hasAcceptRangesBytes(url string) (bool, error) {
@@ -121,6 +113,38 @@ func createFile(url string, content string) error {
 	return nil
 }
 
+func splitDownload(url string) {
+	contentLength, err := getContentLength(url)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	arr := makeRanges(divNum, contentLength)
+	allData, err := goroutine(url, arr)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = createFile(url, allData)
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func batchDownload(url string) {
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Body.Close()
+	byteArray, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = createFile(url, string(byteArray))
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
 func main() {
 	flag.Parse()
 	if flag.Arg(0) == "" {
@@ -136,27 +160,8 @@ func main() {
 		log.Fatalln(err)
 	}
 	if byteFlag == true {
-		// 分割ダウンロード
-		contentLength, err := getContentLength(url)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		arr := makeRanges(divNum, contentLength)
-		goroutine(url, arr)
+		splitDownload(url)
 	} else {
-		// そのままダウンロード
-		resp, err := http.Get(url)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer resp.Body.Close()
-		byteArray, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		err = createFile(url, string(byteArray))
-		if err != nil {
-			log.Fatalln(err)
-		}
+		batchDownload(url)
 	}
 }
