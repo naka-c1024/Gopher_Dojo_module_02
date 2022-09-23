@@ -109,6 +109,7 @@ func createFile(url string, content string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	fmt.Fprint(f, content)
 	return nil
 }
