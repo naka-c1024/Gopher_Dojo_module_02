@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -38,7 +39,7 @@ func goroutine(url string, arrRange []string) (string, error) {
 					return err
 				}
 				defer resp.Body.Close()
-				byteArray, err := ioutil.ReadAll(resp.Body)
+				byteArray, err := io.ReadAll(resp.Body)
 				if err != nil {
 					return err
 				}
